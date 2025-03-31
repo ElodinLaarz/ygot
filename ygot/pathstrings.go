@@ -215,16 +215,22 @@ func StringToStringSlicePath(path string) (*gnmipb.Path, error) {
 	return gpath, nil
 }
 
-// StringToStructuredPath takes a string representing a path, and converts it to
-// a gnmi.Path, using the PathElem element message that is defined in gNMI 0.4.0.
-func StringToStructuredPath(path string) (*gnmipb.Path, error) {
-	parts := util.PathStringToElements(path)
-
+// StringSliceToPath takes a slice of strings representing a path, and converts it into a
+// gnmi.Path. For example, if the Path []string{"a", "b[c=d]", "e"} is input, it is converted into
+//
+//	gnmi.Path{Elem: []*gnmipb.PathElem{
+//		{Name: "a"},
+//		{Name: "b", Key: map[string]string{"c": "d"}},
+//		{Name: "e"},
+//	}}
+//
+// This allows "/" to be part of the element name, which, horrifically, happens sometimes.
+func StringSliceToPath(parts []string) (*gnmipb.Path, error) {
 	gpath := &gnmipb.Path{}
 	for _, p := range parts {
 		name, kv, err := extractKV(p)
 		if err != nil {
-			return nil, fmt.Errorf("error parsing path %s: %v", path, err)
+			return nil, fmt.Errorf("error parsing element %q: %v", p, err)
 		}
 		gpath.Elem = append(gpath.Elem, &gnmipb.PathElem{
 			Name: name,
@@ -233,6 +239,18 @@ func StringToStructuredPath(path string) (*gnmipb.Path, error) {
 	}
 	return gpath, nil
 }
+
+// StringToStructuredPath takes a string representing a path, and converts it to
+// a gnmi.Path, using the PathElem element message that is defined in gNMI 0.4.0.
+func StringToStructuredPath(path string) (*gnmipb.Path, error) {
+	parts := util.PathStringToElements(path)
+	p, err := StringSliceToPath(parts)
+	if err != nil {
+		return nil, fmt.Errorf("error parsing path %q: %v", path, err)
+	}
+	return p, nil
+}
+
 
 // MustStringToPath calls StringToStructuredPath and panics on error.
 // It is intended for use in tests with hard-coded strings.
